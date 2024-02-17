@@ -1,0 +1,460 @@
+#!/usr/bin/env python3
+import serial                   #serial port
+import time
+import pyfirmata2                #USB comms. This version 2 works with Windows USB Comms but throws a warning msg
+import PySimpleGUI as sg        #buttons and windows
+import cv2                      #video
+from PIL import Image
+
+from openpyxl import load_workbook  #excel to save state data
+
+import os
+
+if os.name == 'nt':   #windows
+    wb = load_workbook(filename='c:/users/garry/Documents/sample.xlsx')  # must change for rasberrypi
+    ws = wb.active
+else:
+    wb = load_workbook(filename='/home/garry/Documents/sample.xlsx')  # must change for rasberrypi
+    ws = wb.active
+
+#bit handling not used as yet
+def get_bit(value, n):
+    return ((value >> n & 1) != 0)
+
+def set_bit(value, n):
+    return value | (1 << n)
+
+def clear_bit(value, n):
+    return value & ~(1 << n)
+
+
+
+USB0 = 1
+USB1 = 1   #should be 1 to test read
+
+try:
+    board = (pyfirmata2.ArduinoMega('/dev/ttyACM1'))  #57600 is default
+except Exception as e:
+    print(f"Error: {e}")
+    USB1 = 0
+'''
+try:
+    board2 = (pyfirmata2.Arduino('/dev/ttyACM0')) #open USB with its Rasberrypi port.
+except Exception as e:
+    print(f"Error: {e}")
+    USB0 = 0
+'''
+try:
+    board2 = (pyfirmata2.Arduino('COM7')) #open USB with its Rasberrypi port.
+except Exception as e:
+    print(f"Error: {e}")
+    USB0 = 0
+
+print(USB0)
+print(USB1)
+
+if USB1 == 1:
+    #set up Arduino pins
+    RELAY1 = board.digital[2]
+    RELAY2 = board.digital[3]
+    RELAY3 = board.digital[4]
+    RELAY4 = board.digital[5]
+    RELAY5 = board.digital[6]
+    RELAY6 = board.digital[7]
+    RELAY7 = board.digital[8]
+    RELAY8 = board.digital[9]
+
+    print("Communication Successfully started")
+    RELAYs = [RELAY1, RELAY2, RELAY3, RELAY4, RELAY5, RELAY6, RELAY7, RELAY8]
+
+    RELAY_index = 0
+    it = pyfirmata2.util.Iterator(board)
+    it.start()
+
+if USB0 == 1:
+
+    LED = board2.digital[8]
+    LED2 = board2.digital[5]
+    LED.mode = pyfirmata2.INPUT
+    LED2.mode = pyfirmata2.INPUT
+
+    it2 = pyfirmata2.util.Iterator(board2)
+    it2.start()
+
+"""
+Video window comments found on Web:
+
+Create your window with an alpha_channel=0. Be sure to finalize the window so that it actually gets created.
+This will cause your window to be invisible, but still fully formed. You can do any operation you wish on this "invisible" window
+and then when you're ready to display it, set the alpha channel to 1 by calling window.set_alpha(1)
+"""
+
+def main():
+    down = False
+    togglegraphic1 = toggle_btn_off   #initialise in case USB not connected
+    togglegraphic2 = toggle_btn_off
+    togglegraphic3 = toggle_btn_off
+    togglegraphic4 = toggle_btn_off
+    togglegraphic5 = toggle_btn_off
+    togglegraphic6 = toggle_btn_off
+    togglegraphic7 = toggle_btn_off
+    togglegraphic8 = toggle_btn_off
+    graphic_off1 = 1
+    graphic_off2 = 1
+    graphic_off3 = 1
+    graphic_off4 = 1
+    graphic_off5 = 1
+    graphic_off6 = 1
+    graphic_off7 = 1
+    graphic_off8 = 1
+
+    #set up buttons from excel spreadsheet
+    if USB1 == 1:
+        graphic_off1 = ws['A1'].value           #read state of first button
+        if graphic_off1:
+            togglegraphic1 = toggle_btn_on      #set its starting graphic for button state
+            graphic_off1 = 0
+            RELAYs[0].write(1)
+            #ditto for state tracking. Boolean using integers. Set opposite value as it is flipped before 'if' test
+        else:
+            togglegraphic1 = toggle_btn_off
+            graphic_off1 = 1
+            RELAYs[0].write(0)
+
+        graphic_off2 = ws['A2'].value
+        if graphic_off2:
+            togglegraphic2 = toggle_btn_on
+            graphic_off2 = 0
+            RELAYs[1].write(1)
+        else:
+            togglegraphic2 = toggle_btn_off
+            graphic_off2 = 1
+            RELAYs[1].write(0)
+
+        graphic_off3 = ws['A3'].value
+        if graphic_off3:
+            togglegraphic3 = toggle_btn_on
+            graphic_off3 = 0
+            RELAYs[2].write(1)
+        else:
+            togglegraphic3 = toggle_btn_off
+            graphic_off3 = 1
+            RELAYs[2].write(0)
+
+        graphic_off4 = ws['A4'].value
+        if graphic_off4:
+            togglegraphic4 = toggle_btn_on
+            graphic_off4 = 0
+            RELAYs[3].write(1)
+        else:
+            togglegraphic4 = toggle_btn_off
+            graphic_off4 = 1
+            RELAYs[3].write(0)
+
+        graphic_off5 = ws['A5'].value
+        if graphic_off5:
+            togglegraphic5 = toggle_btn_on
+            graphic_off5 = 0
+            RELAYs[4].write(1)
+        else:
+            togglegraphic5 = toggle_btn_off
+            graphic_off5 = 1
+            RELAYs[4].write(0)
+
+        graphic_off6 = ws['A6'].value
+        if graphic_off6:
+            togglegraphic6 = toggle_btn_on
+            graphic_off6 = 0
+            #RELAYs[5].write(1)
+        else:
+            togglegraphic6 = toggle_btn_off
+            graphic_off6 = 1
+            RELAYs[5].write(0)
+
+        graphic_off7 = ws['A7'].value
+        if graphic_off7:
+            togglegraphic7 = toggle_btn_on
+            graphic_off7 = 0
+            RELAYs[6].write(1)
+        else:
+            togglegraphic7 = toggle_btn_off
+            graphic_off7 = 1
+            RELAYs[6].write(0)
+
+        graphic_off8 = ws['A8'].value
+        if graphic_off8:
+            togglegraphic8 = toggle_btn_on
+            graphic_off8 = 0
+            RELAYs[7].write(1)
+        else:
+            togglegraphic8 = toggle_btn_off
+            graphic_off8 = 1
+            RELAYs[1].write(0)
+
+    ToggleLED = LED_Off
+
+
+    #test value. SHould be zero
+
+    PopUpShown = 0
+    #Main PySimpleGUI window layout. Uses the togglegraphicn pointer to draw the saved button state
+    layout = [[sg.Text('     Relay 1                  Relay2                  Relay3                 Relay4                 Relay5                 Relay6                  Relay7                 Relay8    ')],
+             [sg.Button('', image_data=togglegraphic1, key='-R1-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic2, key='-R2-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic3, key='-R3-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic4, key='-R4-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic5, key='-R5-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic6, key='-R6-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic7, key='-R7-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0),
+              sg.Button('', image_data=togglegraphic8, key='-R8-', button_color=(sg.theme_background_color(), sg.theme_background_color()), border_width=0)],
+              [sg.Button('Off', size=(3, 1), button_color='white on red', key='-B-'), sg.Button('Exit')]]
+
+    window = sg.Window('Window Title', layout, size=(1024,600), element_justification='c', no_titlebar=False)
+    window.resizable = False
+    while True:  # Event Loop
+        event, values = window.read(timeout=0)
+        if (USB1 == 0 and PopUpShown == 0):
+            sg.popup('Relay Box is not available.', no_titlebar=True)
+            PopUpShown = 1       #the popup was shown
+        if event in (sg.WIN_CLOSED, 'Exit'):
+            break
+        elif event != '__timeout__':
+            if event == '-B-':  # if the normal button that changes color and text
+                down = not down
+                window['-B-'].update(text='On' if down else 'Off',
+                    button_color='white on green' if down else 'white on red')
+
+                if down == True:
+
+                    down = not down
+                    window['-B-'].update(text='On' if down else 'Off', button_color='white on green' if down else 'white on red')
+
+            elif (event == '-R1-' and USB1):  # it's the graphical button that changes images
+                graphic_off1 = not graphic_off1     #flip the state
+                window['-R1-'].update(image_data=toggle_btn_off if graphic_off1 else toggle_btn_on)
+                if graphic_off1:
+                    RELAYs[0].write(0)
+                    ws['A1'] = 0            #save the new state
+                else:
+                    RELAYs[0].write(1)
+                    ws['A1'] = 1
+
+            elif (event == '-R2-' and USB1):
+                graphic_off2 = not graphic_off2
+                window['-R2-'].update(image_data=toggle_btn_off if graphic_off2 else toggle_btn_on)
+                if graphic_off2:
+                    RELAYs[1].write(0)
+                    ws['A2'] = 0
+                else:
+                    RELAYs[1].write(1)
+                    ws['A2'] = 1
+
+            elif (event == '-R3-' and USB1):  # if the graphical button that changes images
+                graphic_off3 = not graphic_off3
+                window['-R3-'].update(image_data=toggle_btn_off if graphic_off3 else toggle_btn_on)
+                if graphic_off3:
+                    RELAYs[2].write(0)
+                    ws['A3'] = 0
+                else:
+                    RELAYs[2].write(1)
+                    ws['A3'] = 1
+
+            elif (event == '-R4-' and USB1):  # if the graphical button that changes images
+                graphic_off4 = not graphic_off4
+                window['-R4-'].update(image_data=toggle_btn_off if graphic_off4 else toggle_btn_on)
+
+                if graphic_off4:
+                    RELAYs[3].write(0)
+                    ws['A4'] = 0
+                else:
+                    RELAYs[3].write(1)
+                    ws['A4'] = 1
+
+            elif (event == '-R5-' and USB1):  # if the graphical button that changes images
+                graphic_off5 = not graphic_off5
+                window['-R5-'].update(image_data=toggle_btn_off if graphic_off5 else toggle_btn_on)
+
+                if graphic_off5:
+                    RELAYs[4].write(0)
+                    ws['A5'] = 0
+                else:
+                    RELAYs[4].write(1)
+                    ws['A5'] = 1
+
+            elif (event == '-R6-' and USB1):  # if the graphical button that changes images
+                graphic_off6 = not graphic_off6
+                window['-R6-'].update(image_data=toggle_btn_off if graphic_off6 else toggle_btn_on)
+
+                if graphic_off6:
+                    RELAYs[5].write(0)
+                    ws['A6'] = 0
+                else:
+                    RELAYs[5].write(1)
+                    ws['A6'] = 1
+
+            elif (event == '-R7-' and USB1):  # if the graphical button that changes images
+                graphic_off7 = not graphic_off7
+                window['-R7-'].update(image_data=toggle_btn_off if graphic_off7 else toggle_btn_on)
+
+                if graphic_off7:
+                    RELAYs[6].write(0)
+                    ws['A7'] = 0
+                else:
+                    RELAYs[6].write(1)
+                    ws['A7'] = 1
+
+            elif (event == '-R8-' and USB1):  # if the graphical button that changes images
+                graphic_off8 = not graphic_off8
+                window['-R8-'].update(image_data=toggle_btn_off if graphic_off8 else toggle_btn_on)
+
+                if graphic_off8:
+                    RELAYs[7].write(0)
+                    ws['A8'] = 0
+                else:
+                    RELAYs[7].write(1)
+                    ws['A8'] = 1
+
+
+        if event == '-B-':
+            down = not down
+            window['-B-'].update(text='On' if down else 'Off',
+                                 button_color='white on green' if down else 'white on red')
+
+            try:
+                camera_index = 0  # Change this to the desired camera index
+                cap = cv2.VideoCapture(camera_index)
+                if cap.isOpened():
+                    CamAvail = 1
+                else:
+                    sg.popup(f'Camera {camera_index} is not available.', no_titlebar=True)
+                    CamAvail = 0
+            except Exception as e:
+                print(f"Error: {e}")
+            cap.release()
+            if CamAvail:
+                new_window, cap = sg.Window('OpenCV', [[sg.Image(filename='', key='image')], [sg.Button('ExitCam'), sg.Button('',image_data=ToggleLED,key='-RY-',
+                                        button_color=(
+                                        sg.theme_background_color(),
+                                        sg.theme_background_color()),
+                                        border_width=0)]],
+                                        location=(430, 150), finalize=True, keep_on_top=True,
+
+                                        alpha_channel=0, no_titlebar=False), cv2.VideoCapture(0)
+                PrevLEDstate = LED_Off
+
+                while new_window(timeout=20)[0] is not None:  # give lots of time to cature any exit button...
+                    print('window not none')
+                    new_window['image'](data=cv2.imencode('.png', cap.read()[1])[1].tobytes())
+                    new_window.set_alpha(1)  # show the window now it is fully formed
+                    #new_window['-RY-'].update(image_data=ToggleLED)  # need to speed up...
+                    new_window.refresh()
+                    event , values = new_window.read(timeout=10)
+                    print('window read')
+                    new_window.refresh()
+
+                    if event != ('__timeout__'):
+
+                        if event in (sg.WIN_CLOSED, 'ExitCam'):
+
+                            new_window.close()
+                            cap.release()  # release the camera? Cmd is needed though to allow redraw of cam window
+                            break
+
+                        if USB0 == 1:  # LED values to read
+
+                            LEDstate = board2.digital[8].read()    #can only be 0 or 1 red. Is async?
+                            LEDstate2 = board2.digital[5].read()   #13 and < 2 cannot be used...!2 also?ditto yellow
+                            print(f'State =', LEDstate)
+                            print(f'State2 = ', LEDstate2)
+
+                        if LEDstate2 == 1:
+                            ToggleLED = YellowLED_On
+                            print('In 10')
+                        if LEDstate == 1:
+                            ToggleLED = RedLED_On
+                            print('In 11')
+                        if LEDstate == 0 and LEDstate2 == 0:
+                            ToggleLED = LED_Off
+                            print('In 12')
+
+                        #there is no event to drive the update...
+                        if ToggleLED != PrevLEDstate:
+                            print('LED changed')
+                            new_window['-RY-'].update(image_data=ToggleLED)    #need to speed up..
+                            PrevLEDstate = ToggleLED
+                            new_window.refresh()
+
+
+
+            else:
+                #display a window for reverse detect LEDs when no camera
+                new_window = sg.Window('No CV', [[sg.Image(filename='', key='image')],
+                                                       [sg.Button('ExitCam'), 
+                                                        sg.Button('', image_data=ToggleLED, key='-RY-',
+                                                                  button_color=(
+                                                                      sg.theme_background_color(),
+                                                                      sg.theme_background_color()),
+                                                                  border_width=0)]],
+                                            location=(200, 200), finalize=True, return_keyboard_events=True,
+                                            keep_on_top=True, no_titlebar=False)
+                PrevLEDstate = LED_Off
+                while new_window(timeout=10)[0] is not None:  # give lots of time to cature any exit button...
+
+                    event , values = new_window.read(timeout=10)
+
+                    if event != ('__timeout__'):
+
+                        if event in (sg.WIN_CLOSED, 'ExitCam'):
+
+                            new_window.close()
+                            #cap.release()  # release the camera? Cmd is needed though to allow redraw of cam window
+                            break
+                        LEDstate = 3
+                        LEDstate2 = 3
+
+                        if USB0 == 1:  # LED values to read
+                            LEDstate = board2.digital[8].read()    #can only be 0 or 1 red
+
+                            LEDstate2 = board2.digital[5].read()   #ditto yellow
+                            print(f'State =',LEDstate)
+                            print(f'State2 = ',LEDstate2)
+
+                        if LEDstate2 == 1:
+                            print('In 4')
+                            ToggleLED = YellowLED_On
+                        if LEDstate == 1:
+                            print('In 5')
+                            ToggleLED = RedLED_On
+                        if LEDstate == 0 and LEDstate2 == 0:
+                            ToggleLED = LED_Off
+                            print('In 6')
+
+                        if ToggleLED != PrevLEDstate:
+                            print('LED changed')
+                            new_window['-RY-'].update(image_data=ToggleLED)  # need to speed up..
+                            PrevLEDstate = ToggleLED
+
+            down = not down
+            window['-B-'].update(text='On' if down else 'Off',
+                                 button_color='white on green' if down else 'white on red')
+
+            if os.name == 'nt':
+                wb.save('c:/users/garry/Documents/sample.xlsx')  # must change for rasberrypi
+            else:
+                wb.save('/home/garry/Documents/sample.xlsx')  # must change for rasberrypi
+
+    window.close()
+
+
+if __name__ == '__main__':
+    #toggle button graphics
+
+    toggle_btn_off = b'iVBORw0KGgoAAAANSUhEUgAAAGQAAAAoCAYAAAAIeF9DAAAPpElEQVRoge1b63MUVRY//Zo3eQHyMBEU5LVYpbxdKosQIbAqoFBraclatZ922Q9bW5b/gvpBa10+6K6WftFyxSpfaAmCEUIEFRTRAkQFFQkkJJghmcm8uqd763e6b+dOZyYJktoiskeb9OP2ne7zu+d3Hve2smvXLhqpKIpCmqaRruu1hmGsCoVCdxiGMc8wjNmapiUURalGm2tQeh3HSTuO802xWDxhmmaraZotpmkmC4UCWZZFxWKRHMcZVjMjAkQAEQqFmiORyJ+j0ei6UCgUNgyDz6uqym3Edi0KlC0227YBQN40zV2FQuHZbDa7O5fLOQBnOGCGBQTKNgzj9lgs9s9EIrE4EomQAOJaVf5IBYoHAKZpHs7lcn9rbm7+OAjGCy+8UHKsD9W3ruuRSCTyVCKR+Es8HlfC4bAPRF9fHx0/fpx+/PFH6unp4WOYJkbHtWApwhowYHVdp6qqKqqrq6Pp06fTvHnzqLq6mnWAa5qmLTYM48DevXuf7e/vf+Suu+7KVep3kIWsXbuW/7a0tDREo9Ed1dXVt8bjcbYK/MB3331HbW1t1N7eTgAIFoMfxSZTF3lU92sUMcplisJgxJbL5Sifz1N9fT01NjbSzTffXAKiaZpH+/v7169Zs+Yszr344oslFFbWQlpaWubGYrH3a2pqGmKxGCv74sWL9Pbbb1NnZyclEgmaNGmST13kUVsJ0h4wOB8EaixLkHIEKKAmAQx8BRhj+/btNHnyZNqwYQNNnDiR398wjFsTicSBDz74oPnOO+/8Gro1TbOyhWiaVh+Pxz+ura3FXwbj8OHDtHv3bgI448aNYyCg5Ouvv55mzJjBf2traykajXIf2WyWaQxWdOrUKTp//rww3V+N75GtRBaA4lkCA5NKpSiTydDq1atpyZIlfkvLstr7+/tvTyaT+MuAUhAQVVUjsVgMYABFVvzOnTvp888/Z34EIDgHjly6dCmfc3vBk4leFPd/jBwo3nHo559/pgMfHaATX59ApFZCb2NJKkVH5cARwAAUKBwDdOHChbRu3Tq/DegrnU4DlBxAwz3aQw895KpRUaCsp6urq9fDQUHxsIojR47QhAkTCNYCAO677z5acNttFI3FyCGHilaRUqk0myi2/nSaRwRMV9c1UhWFYrEozZo9mx3eyW9OMscGqexq3IJS7hlJOk+S3xTnvLyNB+L333/P4MycOVMYwGRN02pt234PwHFAJCxE1/Vl48aNO1hXV6fAEj777DPCteuuu44d9w033EDr16/3aQlKv3TpEv8tHS6exXiCvmpqaigWj5NCDqXT/bT9tdfoYnc39yWs5WqXcr6j0rHwK/I+KAy66u7upubmZlq8eLG47mQymeU9PT0fg95UD00lFAptSyQSHNrCgcM6xo8fz2DceOONtHnTJt4v2kXq7LxAHR0d7CvYccujRlNIwchX3WO06ejopM6ODrKsIgP0xy1bGGhhSRgZV7sELaNcRBnclzcwDt4dLAPdAhih+3A4/A8wEKyIAdE0bU0kEuGkDyaGaAo3YwMod999NyvZtCx20JlMf8lDkaK6ICgq8X/sRrxj1QUMwJw/D1BMvu8P99/PYTPCRAHI1Uxf5aLESvQ1FChQPPQKHQvRNG1pNBpdDf2rHl2hHMI3nD592g9tcdy8ppl03eCR3N3VxT5D5n9331U6/2XLUEv2Fe9vsWjRha5uKloWhUMGbdiwnjkVPkVEGWPNUoLnKJB/BdvACqBb6Bg5nbhmGMZWpnBVVWpDodDvw+EQO+H9+/fzDbhx9uzZTC2OU6Te3l5Wms/3AV9R8tCOe9FRSps4pJBdtCh56RKHyfX1DTRnzhx2dgAf/mQ0Iy9ky0jMFi1aVHL+k08+YWWAs4WibrnlFlq+fPmQ/bW2ttJPP/1EW7ZsGbLdiRMn2P/KdT74EfFbYAboGAn2rFlu4qjrGjCoVVVVawqFQiHDCHG0hNwBSKGjhYsWckf5XJ5yHBkJK3AtwPcVgq48y1A0lVRN8Y5Vv72GB1I1DgXzuRw5tsPZLHwJnJ5cdrnSbdq0afTAAw8MAgOybNkyVuqUKVN8yxxJJRa0i204wful0+lBVEwD1sA6hq77+lI8eBVFBQZNqqZpvxMZ97Fjxxg9HONhq6uq2IlnsjkXaU/xLlVppLHCNRck35m759FO0zyHrwpwNB8kvJjt2DS+bjxn/fAloMWRKGY4gWXI8X4luffee5kJ8LsjEQyakVArgEBbYRWyyNQFXUPnQoCFrmnafFwEICgUohEU1tDQQLbtlQXsImmqihyPFMWjI4bbIdUBFam8r5CbCJLi0pU79AjunRzVvU/1ruPFsOHhkO0fOnRoIFu9QtpasGCBv//DDz/Qu+++S2fOnOF3RMSIeh1yIggS3D179pQMhMcee4yTWVEWEgI9wfKEwDHv27dvUPUBx3DecjgvrguQ0Aa6xvMJqgQWuqqqMwXP4SHA4xCMWlGbwYh3exXde0onDwQSICnAhc+riuIn74yh15oR5HMqjyIEDPUN9cynIgS+0rxEKBuOc9u2bczXSG5h+QgiXn31VXrwwQc5t4KffOutt0pCb7QTpaCgUhEJyccoJUH5QfBEqUi0C1q+qBIjg5f6m6Fjlk84H/AekjgcV1VXk+Ol/6Cjih5ciOfkub2iuqA4A5Yi4GMsaaCtYxdpwvgJPh1cKWWBrjCSIaADhJg4J49YKB/hOwCBgnFdBuTRRx8d1O/JkyfZksSAhSBRxiYLAoXnn3/eD1AqvY+okCeTSd96VFWtASBVgtegFNFJyNDdhwTlqKXoO/6oH8BpiKDLvY5+yjSwHcdNOD0KG80kEX5KTBHIIxj7YAMhSNaG+12E5hiwsJyhBP0gIsXAFgOjkgidCwEWuhzNyOk+/Af8BUdRnqpLaojSUen5YSTQGC8gttFw6HIfsI5KRUxQspCuri6aOnXqkP1isCB6Gu4ZOSq9zLxKfj7dcZw+x3Gq0BG4U/wgRhfMXCR//s3Sv25hl52GDw1T0zAIKS5zMSUWbZsLkqMlGJ1QCCwD1dUDBw6UHf1w7hBEdwBEVsrjjz8+yKmDXuCL5HZw6shNhFMXDhu+J+hTyonQuRBgoXsrJqpwDlVesUIC3BaJRlh7hqaxB/B8OXk+2hvtiqi4+2gzpqoHkIi6PJ5TvAQRlFfwKOpCV9eoluORaM6dO5dp4+GHH+aKNWpvUBIsA5EVSkLkRWHBAieOca/s1EVkFHTyACno1L11CEM+o5hhRFAgRWCXdNu2TxWLxQaghYdEZIJ9/J00eTKRbZIaCZPDilcGrMJz0H6465kEY6EKvDwa5PkRhfy4S3HbF7MWJ4ciJA2+8C8RvBzmbwAIBGGqHKoGZceOHX6oLysa5wTlyRIsi4iioezsg/Mj5WhORLCYUZTuO606jnNMOFPkAzB37KNE4BRdSsEmlKX5SR6SQdU77yaFqtfGTQA1r6blZvAaZ/AaX1M4D7FdJ+7Y9O2335aMUnlJzS/ZEOm8+eabw8KJFR9ggmB4e7kSLL3L7yCfl6/h3aHrm266yffhtm0fV23b3i8mR+bPn8+NgBx4NZnsYZ7PZtxMHQBwJq55ZRKpNKJ5inYVrvrZO498v42bteNcNpsjx7G5DI0QFCNytOZG8Bznzp2j5557jvbu3TvoOsrfTzzxBE8vI+TFCB8pXVZSMlUAo9IcPJeP8nmuoQmxbbsVlNViWVbBsqwQHg4ZOhwjlHPkiy9oxR13kJ3P880iKWKK4mxcJHkeiSkDeYbrLRQ/ifTDAcWhXD5Hhby7EqZ1XyuHh6JaUO4lfomgLzwz1gOgYArnLSIfXMO7iOQPx0ePHuUAALOeGBTwIeWeBZNyTz75pF9shd8dDozgOYS6CJqga+l3gEELoiwsd3wvn89vxMOtXLmSXn75ZR6xKKXM6ezkim9vX68/Hy78uVISbXl+Y8C1uDgEEhVMUvVe6iWbHDrXfo6OHT/GeYBY8zVagJBUwkDfcp1M8dZLydVlgCCmIMjL1is9B/oT+YjwfZXAKAeMyGk2btzotykWi8Agyfxgmua/gBiQmzVrFq8iwTFuRljHcTXTWDfPaah+kVHMhahSAdGt6mr+vIjq+ReVR1R3dxf3hQryG2+84U+EyRYyWiJCdvSN3wA4YoKIZ+ekyE6uwoqp5XI0JqItWJhYxXk5YIhKMPIelG1owGqegc4ZENu2d+fz+cNi9m7Tpk0MiEASnGuaFs/2dXRcoGwmw5EUNkVUc0maPfRnEL3pTkXhEjumcTHraBaLXE/CbyBslOP2K3Xo/4tNVra8lQNA3jDgUUuDLjZv3iw780PZbHYP9K0hTvc6OKYoyp9CoZDCixJiMfrqq694FKATOF6Ej7AAHMMpozDII01xfUq5OQwoHY4bnIsySSFf4AVkyAvgs8DBQ43Iq0VGa5EDEk5MiUvW4eTz+ft7e3vP4roMSLvjOBN1XV8CM4TyoUxM6YIzAQJm2VA1TcQTbDHpVIp9S8Es8LFYHIb7+nr7qKu7i3r7+tgqIOfOtdMrr/yHHaMMxtW6eC44+iu1Ce4PBQYWyzU1NfnXsTo+lUr9G8EE1xI//PBDv0NVVaPxePwgFsqJFYrvvPMOT3lCeeBcOEdUSRcvXkS1NdJCOZIrjAOFeeyjxNzW9hFXTGF5oClBVWNlGRCNwkI5VAjuuecevw0WyqVSqd8mk8ks2vCMqQwIuWUDfykplAaFARAAA/qCtXhL7KmurpamT5tOU6ZiKalbagAUuWyOkj1JOtt+1l80IRxr0ImPFTCCUinPKLeUFMoGTWHqWAiWknqrFnkpqZi1HATIqlWrMFk0Nx6P82Jrsb4XieLrr7/O88CinO0MfP8wqGKrDHzk409Xim2sLiWly1hsDdoW0RSCJFFdRlvLss729/c3NzY2fo3gRi7Bl139joZtbW3LHcfZYds2f46AXGTr1q1MO8h+kaNAsZVWi/gZvLeUUvGmbRFJ4IHHsgR9RPBzBGzwwcgzsKpGBq9QKOBzhI0rVqw4Q16RUZaKH+w0Njae3b9//+22bT9lWZb/wQ6iA/wIoqYvv/ySK6siivLXp5aJtsYqNVUSAYao7MLHYmEIyvooQckTWZ4F4ZO2Z9Pp9CNNTU05+ZosZSkrKAcPHsQnbU/H4/ElYgX8/z9pG14kSj+UyWT+vnLlyoNBAF566aWS4xEBIuTTTz/Fcse/RqPRteFwOCy+ExHglFtuea2IHCJ7/qRgmubOfD7/jPfRpz+TOFQYPQiQoUQ4asMw8Fk0FtitCIVCv9F1nT+LVlW16hoFJOU4Tsq2bXwWfdyyrNZCodBSKBSScNgjXsBBRP8FGptkKVwR+ZoAAAAASUVORK5CYII='
+    toggle_btn_on = b'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'
+    LED_Off = b'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'
+    YellowLED_On = b'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'
+    RedLED_On = b'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'
+    main()
+
+
+
